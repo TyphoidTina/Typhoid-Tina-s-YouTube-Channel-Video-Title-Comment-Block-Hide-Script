@@ -1,0 +1,47 @@
+*************************************************************************************************************************************
+########################| HOW TO RUN THE TYPHOID TINA CHANNEL/VIDEO TITLE/COMMENT BLOCKER TAMPERMONKEY SCRIPT |######################
+*************************************************************************************************************************************
+First, you need to go to Tampermonkey's website tampermonkey.net and add the extension for whatever web browser you use. 
+Once you have the extension, copy the Typhoid Tina code precisely as it is on github.
+(There is also a copy icon on the top right corner of the code).
+
+Open the Tampermonkey extension. Select "Create a new script..." (it may open a new tab the first time you use it, just close it).
+IMPORTANT: delete all of the default code of the new file so the field is blank and you are on line 1 with no spaces. 
+Paste the github script into Tampermonkey.
+File -> Save to disk -> Name it whatever and save it to whereever you want on your computer as a .js file
+You may now manually edit what keywords and channels you would like blocked and hidden after:
+
+const BLOCKED_PHRASES = [
+const BLOCKED_TITLE_KEYWORDS = [
+const BLOCKED_CHANNELS = [
+
+functions respectively. Just copy the format and syntax of the examples.
+
+Voilà! Now all you have to do is update and save the script any time you make changes!
+This may require refreshing the page to take effect. I highly recommend deleting your watch history before enabling the script if your
+feed is especially problematic. Enjoy!
+
+BEWARE: I gave an example in BLOCKED_PHRASES = [ in which I included "first",
+I advise against using single words for BLOCKED_PHRASES = [ because then it will block all comments with the word "first" in them
+regardless of the context or content of the comment itself.
+
+*************************************************************************************************************************************
+#######################################################| ACKNOWLEDGEMENTS |##########################################################
+*************************************************************************************************************************************
+I collaborated with Claude to write this code (because I am a talentless vibe coding wiener) because YouTube has a tendency to 
+aggressively spam your algorithm with certain types of content (eg. reaction videos, political commenters etc etc). But also to filter 
+out all the 12 year olds that love to spam the comment sections. I just got sick of it all. YouTube does this because they are banking
+on wasting as much time using their product as you will allow. I got a clanker to write the script to give me peace of mind and for 
+a quality of life improvement, because heaven forbid YouTube fixes their "Not Interested" and "Do not recommend channel" features.
+If you find the script helpful I encourage you to spread the word and share links.
+
+As far as comment spam goes: my philosophy is the same as extinguishing a flame. You deprive the flame of oxygen and a fuel source and
+it suffocates and eventually extinguishes. Same thing with nasty patterned comments, if you deprive the comments ability to get any
+attention, they will eventually suffocate and be so deprivated that they give up. 12 year olds, agent provacateurs and crass vulgarians 
+HATE when they are suddenly powerless and feel invisible and deprived of the attention they are addicted to.
+
+I highly encourage talented scripters/coders to improve the existing Typhoid Tina Tampermonkey script or expand upon the code, 
+and of course by all means go right ahead and take ownership/authorship of your improvements.
+It's hard for me to take any credit from code I hardly wrote myself.
+
+-Typhoid Tina
