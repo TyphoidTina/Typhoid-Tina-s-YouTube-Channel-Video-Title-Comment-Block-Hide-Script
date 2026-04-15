@@ -1,0 +1,333 @@
+// ==UserScript==
+// @name         Typhoid Tina's YouTube Spam Filter, Channel & Sponsored Ad Blocker
+// @namespace    http://tampermonkey.net/
+// @version      0.03
+// @description  Hides spam comments by keyword (including l33tspeak variants), blocks channels from feed and recommendations, hides sponsored ads, and hides videos and Shorts by title keyword.
+// @author       Typhoid Tina
+// @match        https://www.youtube.com/*
+// @grant        none
+// ==/UserScript==
+
+//@match tells the script to run on any YouTube page.
+// @grant declares which TamperMonkey APIs the script is allowed to use.
+// Anything after // is a comment and won't affect how the code runs.
+
+(function () {
+  "use strict";
+
+  // ============================================================
+  // BLOCKED COMMENT PHRASES
+  // Any comment containing one of these phrases (case-insensitive)
+  // will be hidden entirely, including its replies.
+  // Add or remove phrases as needed.
+  // Be sure to include a comma immediately after the quotation marks.
+  // The l33tspeak normalizer below will automatically catch
+  // intentional misspellings like "L1btard" or "D3m0nrat".
+  // ============================================================
+  const BLOCKED_PHRASES = [
+    "insane refresh pull",
+    "first",
+    "refresh pull",
+    "legendary refresh pull",
+    "notification squad",
+    "libtard",
+    "demonrat",
+    "demoncrap",
+    "democrap",
+    "tds",
+    "trump derangement syndrome",
+    "check out my channel",
+    "is a recession indicator",
+    "little bro",
+  ];
+
+  // ============================================================
+  // BLOCKED VIDEO & SHORTS TITLE KEYWORDS
+  // Any video or Short whose title contains one of these phrases
+  // (case-insensitive, l33tspeak-proof) will be hidden from your
+  // homepage feed, sidebar recommendations, and Shorts shelf.
+  // This list is separate from BLOCKED_PHRASES so you can control
+  // comment filtering and title filtering independently.
+  // Be sure to include a comma immediately after the quotation marks.
+  // ============================================================
+  const BLOCKED_TITLE_KEYWORDS = [
+    "reaction",
+    "reacts to",
+    "reacting to",
+    "reacting to:",
+    "my reaction",
+    "my reaction to",
+    "my reaction to:",
+    "(reacts)",
+    "[reacts]",
+    "angine de poitrine",
+    // Add your own title keywords here...
+  ];
+
+  // ============================================================
+  // BLOCKED CHANNELS
+  // Any video card on the homepage, recommendations, or search
+  // results from these channels will be hidden.
+  // Use the channel name EXACTLY as it appears under the video
+  // thumbnail (e.g. "Fox News", "CNN", "PragerU"). *IMPORTANT*
+  // Be sure to include a comma immediately after the quotation marks.
+  // ============================================================
+  const BLOCKED_CHANNELS = [
+    "Fox News",
+    "Sky News Australia",
+    "China Uncensored",
+    "MrBeast",
+    "NVIDIA",
+    "David Pakman Show",
+    "OANN",
+    "Newsmax",
+    "The Daily Wire",
+    "The Jimmy Dore Show",
+    "The Tucker Carlson Show",
+    "David Pakman Show",
+  ];
+
+  // ============================================================
+  // L33TSPEAK NORMALIZER
+  // Converts common l33tspeak character substitutions back to their
+  // plain English equivalents before running keyword comparisons.
+  // This means you only need to add the normal word to BLOCKED_PHRASES
+  // or BLOCKED_TITLE_KEYWORDS and variants like "l!bt4rd" or
+  // "d3m0nr4t" get caught automatically.
+  // Substitutions covered:
+  //   @ or 4  → a
+  //   8        → b
+  //   (        → c
+  //   3        → e
+  //   9        → g
+  //   #        → h
+  //   1 or !   → i
+  //   |        → l
+  //   0        → o
+  //   5 or $   → s
+  //   7        → t
+  //   2        → z
+  // You can ignore this function unless you know what you're doing.
+  // ============================================================
+  function normalizeLeet(text) {
+    return text
+      .toLowerCase()
+      .replace(/@/g, "a")
+      .replace(/4/g, "a")
+      .replace(/8/g, "b")
+      .replace(/\(/g, "c")
+      .replace(/3/g, "e")
+      .replace(/9/g, "g")
+      .replace(/#/g, "h")
+      .replace(/1/g, "i")
+      .replace(/!/g, "i")
+      .replace(/\|/g, "l")
+      .replace(/0/g, "o")
+      .replace(/5/g, "s")
+      .replace(/\$/g, "s")
+      .replace(/7/g, "t")
+      .replace(/2/g, "z");
+  }
+
+  // ============================================================
+  // TITLE MATCH HELPER
+  // Accepts a title string and checks it against BLOCKED_TITLE_KEYWORDS
+  // using both raw and l33tspeak-normalized text so no variant slips
+  // through. Used by both the feed and Shorts filter functions below.
+  // You can ignore this function unless you know what you're doing.
+  // ============================================================
+  function titleIsBlocked(titleText) {
+    const raw = titleText.toLowerCase();
+    const normalized = normalizeLeet(raw);
+    return BLOCKED_TITLE_KEYWORDS.some(
+      (keyword) =>
+        raw.includes(keyword.toLowerCase()) ||
+        normalized.includes(normalizeLeet(keyword))
+    );
+  }
+
+  // ============================================================
+  // COMMENT FILTER
+  // Scans all visible comment threads and hides any that contain
+  // a blocked phrase. Runs each comment through the l33tspeak
+  // normalizer first so variants get caught too.
+  // YouTube uses <ytd-comment-thread-renderer> for each comment
+  // + replies, so hiding that hides the whole thread.
+  // You can ignore this function unless you know what you're doing.
+  // ============================================================
+  function filterComments() {
+    const commentThreads = document.querySelectorAll(
+      "ytd-comment-thread-renderer"
+    );
+
+    commentThreads.forEach((thread) => {
+      // Run the text through normalizeLeet() to catch l33tspeak,
+      // but also keep the raw text to catch normal spellings.
+      const rawText = thread.innerText.toLowerCase();
+      const normalizedText = normalizeLeet(rawText);
+
+      const isSpam = BLOCKED_PHRASES.some(
+        (phrase) =>
+          rawText.includes(phrase.toLowerCase()) ||
+          normalizedText.includes(normalizeLeet(phrase))
+      );
+
+      if (isSpam) {
+        thread.style.display = "none";
+      }
+    });
+  }
+
+  // ============================================================
+  // CHANNEL BLOCKER & TITLE FILTER — HOMEPAGE & RECOMMENDATIONS
+  // YouTube renders video cards on the homepage as
+  // <ytd-rich-item-renderer> elements. We check both the channel
+  // name and the video title against our blocked lists.
+  // You can ignore this function unless you know what you're doing.
+  // ============================================================
+  function filterFeedVideos() {
+    const feedItems = document.querySelectorAll("ytd-rich-item-renderer");
+
+    feedItems.forEach((item) => {
+      // Check channel name against BLOCKED_CHANNELS
+      const channelEl = item.querySelector("#channel-name, ytd-channel-name");
+      if (channelEl) {
+        const channelName = channelEl.innerText.trim().toLowerCase();
+        const channelIsBlocked = BLOCKED_CHANNELS.some((name) =>
+          channelName.includes(name.toLowerCase())
+        );
+        if (channelIsBlocked) {
+          item.style.display = "none";
+          return; // No need to check title if channel is already blocked
+        }
+      }
+
+      // Check video title against BLOCKED_TITLE_KEYWORDS
+      const titleEl = item.querySelector("#video-title");
+      if (titleEl && titleIsBlocked(titleEl.innerText)) {
+        item.style.display = "none";
+      }
+    });
+  }
+
+  // ============================================================
+  // CHANNEL BLOCKER & TITLE FILTER — SIDEBAR RECOMMENDATIONS
+  // While watching a video, recommendations appear in the sidebar
+  // as <ytd-compact-video-renderer> elements. Same logic applies.
+  // You can ignore this function unless you know what you're doing.
+  // ============================================================
+  function filterSidebarVideos() {
+    const sidebarItems = document.querySelectorAll(
+      "ytd-compact-video-renderer"
+    );
+
+    sidebarItems.forEach((item) => {
+      // Check channel name against BLOCKED_CHANNELS
+      const channelEl = item.querySelector("#channel-name, ytd-channel-name");
+      if (channelEl) {
+        const channelName = channelEl.innerText.trim().toLowerCase();
+        const channelIsBlocked = BLOCKED_CHANNELS.some((name) =>
+          channelName.includes(name.toLowerCase())
+        );
+        if (channelIsBlocked) {
+          item.style.display = "none";
+          return; // No need to check title if channel is already blocked
+        }
+      }
+
+      // Check video title against BLOCKED_TITLE_KEYWORDS
+      const titleEl = item.querySelector("#video-title");
+      if (titleEl && titleIsBlocked(titleEl.innerText)) {
+        item.style.display = "none";
+      }
+    });
+  }
+
+  // ============================================================
+  // SHORTS TITLE FILTER
+  // YouTube renders Shorts in a shelf on the homepage using
+  // <ytd-rich-item-renderer> elements that contain a
+  // <ytd-reel-item-renderer> inside them. The title lives in
+  // the "aria-label" attribute on the anchor element since Shorts
+  // display titles differently from regular videos.
+  // You can ignore this function unless you know what you're doing.
+  // ============================================================
+  function filterShorts() {
+    const shortsItems = document.querySelectorAll("ytd-reel-item-renderer");
+
+    shortsItems.forEach((item) => {
+      // Shorts store their title in the aria-label of the link element
+      const linkEl = item.querySelector("a#thumbnail-overlay");
+      const titleText =
+        linkEl?.getAttribute("aria-label") || item.innerText || "";
+
+      if (titleIsBlocked(titleText)) {
+        // Walk up to the parent rich item renderer to hide the whole card
+        const card = item.closest("ytd-rich-item-renderer") || item;
+        card.style.display = "none";
+      }
+    });
+  }
+
+  // ============================================================
+  // SPONSORED AD BLOCKER
+  // YouTube marks promoted videos in the feed with a "Sponsored"
+  // label inside the video card. We look for that label and hide
+  // the entire card if found, so no ad cards appear in your feed.
+  // You can ignore this function unless you know what you're doing.
+  // ============================================================
+  function filterSponsoredVideos() {
+    const feedItems = document.querySelectorAll("ytd-rich-item-renderer");
+
+    feedItems.forEach((item) => {
+      // YouTube places the "Sponsored" label inside these elements
+      const adBadge = item.querySelector(
+        "ytd-badge-supported-renderer, #overlays span, .ytd-promoted-sparkles-web-renderer"
+      );
+
+      if (adBadge && adBadge.innerText.trim().toLowerCase() === "sponsored") {
+        item.style.display = "none";
+      }
+    });
+  }
+
+  // ============================================================
+  // MASTER FILTER — runs all five filters in one call.
+  // Called by the MutationObserver whenever new content loads.
+  // Comment out any line here with "//" to temporarily disable that filter.
+  // You can ignore this function unless you know what you're doing.
+  // ============================================================
+  function runAllFilters() {
+    filterComments();
+    filterFeedVideos();
+    filterSidebarVideos();
+    filterShorts();
+    filterSponsoredVideos();
+  }
+
+  // ============================================================
+  // MUTATION OBSERVER
+  // Watches the entire page for new content being added to the DOM
+  // (e.g. scrolling loads more videos, comments load dynamically).
+  // Fires runAllFilters() whenever anything new appears.
+  // You can ignore this function unless you know what you're doing.
+  // ============================================================
+  const observer = new MutationObserver(() => {
+    runAllFilters();
+  });
+
+  // ============================================================
+  // INITIALIZATION
+  // Wait for the page to fully load, then start observing.
+  // Also run once immediately in case content is already visible.
+  // You can ignore this function unless you know what you're doing.
+  // ============================================================
+  window.addEventListener("load", () => {
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+
+    runAllFilters();
+  });
+})();
